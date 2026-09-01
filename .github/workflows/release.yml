@@ -1,0 +1,72 @@
+name: Build and Release
+
+on:
+  workflow_dispatch:          # 手动触发（仅构建）
+  push:
+    tags:
+      - 'v*'                 # 推送 tag 触发（构建并发布）
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - os: windows-latest
+            artifact: apng-generator-windows-x64.zip
+          - os: ubuntu-22.04        # 使用 Ubuntu 22.04 以满足 linuxdeployqt 的 glibc 要求
+            artifact: apng-generator-linux-x64.tar.gz
+
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.7.0'
+          cache: true
+
+      - name: Configure CMake
+        run: |
+          echo "QT_ROOT = $QT_ROOT"
+          cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=$QT_ROOT
+
+      - name: Build
+        run: cmake --build build --config Release
+
+      # Windows 部署
+      - name: Deploy Windows
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          windeployqt --release --compiler-runtime build/Release/apng_generator.exe
+          Compress-Archive -Path build/Release/* -DestinationPath ${{ matrix.artifact }}
+
+      # Linux 部署
+      - name: Deploy Linux
+        if: runner.os == 'Linux'
+        run: |
+          QMAKE_PATH=$(which qmake)
+          if [ -z "$QMAKE_PATH" ]; then
+            echo "qmake not found in PATH"
+            exit 1
+          fi
+          sudo apt-get update
+          sudo apt-get install -y libfuse2
+          wget -q https://github.com/probonopd/linuxdeployqt/releases/download/continuous/linuxdeployqt-continuous-x86_64.AppImage
+          chmod +x linuxdeployqt-continuous-x86_64.AppImage
+          mkdir -p dist
+          cp build/apng_generator dist/
+          ./linuxdeployqt-continuous-x86_64.AppImage dist/apng_generator -qmake=$QMAKE_PATH -no-translations
+          tar czf ${{ matrix.artifact }} -C dist .
+
+      # 发布资产（仅 tag 触发时运行）
+      - name: Upload Release Asset
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ matrix.artifact }}
