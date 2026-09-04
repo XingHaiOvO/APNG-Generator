@@ -118,17 +118,12 @@ void MainWindow::setupUi()
     });
 
     statusBar()->showMessage("Ready");
+
+    setAcceptDrops(true);
 }
 
-void MainWindow::addFrames()
+void MainWindow::addFramesFromFiles(const QStringList &fileNames)
 {
-    QStringList fileNames = QFileDialog::getOpenFileNames(
-        this,
-        "Select Images",
-        QString(),
-        "Images (*.png *.jpg *.jpeg *.bmp *.gif *.tiff);;All Files (*)"
-    );
-
     if (fileNames.isEmpty())
         return;
 
@@ -141,24 +136,23 @@ void MainWindow::addFrames()
         reader.setAutoTransform(true);
         QImage img = reader.read();
         if (img.isNull()) {
-            QMessageBox::warning(this, "Error", "Failed to load image: " + fileName);
+            QMessageBox::warning(this, "Error", "加载图片失败: " + fileName);
             continue;
         }
 
         if (!firstSize.isValid()) {
             firstSize = img.size();
-        }
-        else if (img.size() != firstSize) {
+        } else if (img.size() != firstSize) {
             QMessageBox::warning(this, "Warning",
-                                 QString("Image %1 has size %2x%3, expected %4x%5. It will be skipped.")
+                                 QString("图片大小 %2x%3 请保持与 %4x%5 一致. \n %1 将被跳过.")
                                      .arg(fileName)
                                      .arg(img.width()).arg(img.height())
                                      .arg(firstSize.width()).arg(firstSize.height()));
             continue;
         }
 
-        if (img.format() != QImage::Format_ARGB32) {
-            img = img.convertToFormat(QImage::Format_ARGB32);
+        if (img.format() != QImage::Format_RGBA8888) {
+            img = img.convertToFormat(QImage::Format_RGBA8888);
         }
 
         FrameItem frame;
@@ -169,6 +163,19 @@ void MainWindow::addFrames()
     }
 
     refreshFrameList();
+}
+
+void MainWindow::addFrames()
+{
+    QStringList fileNames = QFileDialog::getOpenFileNames(
+        this,
+        "Select Images",
+        QString(),
+        "Images (*.png *.jpg *.jpeg *.bmp *.gif *.tiff);;All Files (*)"
+    );
+    if (fileNames.isEmpty())
+        return;
+    addFramesFromFiles(fileNames);
 }
 
 void MainWindow::removeSelectedFrame()
@@ -227,9 +234,9 @@ void MainWindow::generateApng()
 
     if (success) {
         QMessageBox::information(this, "Success", "APNG 保存成功.");
-        statusBar()->showMessage("APNG saved: " + savePath);
+        statusBar()->showMessage("图片已保存在: " + savePath);
     } else {
-        QMessageBox::critical(this, "Error", "Failed to generate APNG:\n" + error);
+        QMessageBox::critical(this, "Error", "生成 APNG 失败:\n" + error);
     }
 }
 
@@ -330,5 +337,67 @@ void MainWindow::updatePreviewTimerInterval()
             delayMs = (frame.delayNum * 1000) / frame.delayDen;
         }
         m_previewTimer->start(delayMs);
+    }
+}
+
+// 实现拖拽事件
+void MainWindow::dragEnterEvent(QDragEnterEvent *event)
+{
+    // 接受所有本地文件拖拽，允许用户放下后看到提示
+    if (event->mimeData()->hasUrls()) {
+        event->acceptProposedAction();
+    } else {
+        event->ignore();
+    }
+}
+
+void MainWindow::dropEvent(QDropEvent *event)
+{
+    const QList<QUrl> urls = event->mimeData()->urls();
+    QStringList supportedFiles;
+    QStringList unsupportedFiles;
+
+    // 支持的扩展名列表
+    static const QStringList supportedExtensions = {
+        "png", "jpg", "jpeg", "bmp", "gif", "tiff"
+    };
+
+    for (const QUrl &url : urls) {
+        if (!url.isLocalFile()) {
+            unsupportedFiles << url.toString();
+            continue;
+        }
+
+        QString filePath = url.toLocalFile();
+        QFileInfo fi(filePath);
+        if (fi.isDir()) {
+            unsupportedFiles << filePath;  // 文件夹不支持
+            continue;
+        }
+
+        QString suffix = fi.suffix().toLower();
+        if (supportedExtensions.contains(suffix)) {
+            supportedFiles << filePath;
+        } else {
+            unsupportedFiles << filePath;
+        }
+    }
+
+    // 先处理不支持的，给出友好提示
+    if (!unsupportedFiles.isEmpty()) {
+        QString message = "以下文件不是支持的图片格式，已忽略：\n\n";
+        for (const QString &file : unsupportedFiles) {
+            message += "• " + QFileInfo(file).fileName() + "\n";
+        }
+        message += "\n支持的格式：PNG、JPEG、BMP、GIF、TIFF";
+        QMessageBox::warning(this, "不支持的文件", message);
+    }
+
+    // 处理支持的图片文件
+    if (!supportedFiles.isEmpty()) {
+        addFramesFromFiles(supportedFiles);
+        event->acceptProposedAction();
+    } else {
+        event->ignore();
     }
 }

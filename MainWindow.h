@@ -8,6 +8,9 @@
 #include <QTimer>
 #include <QSpinBox>
 #include <QPushButton>
+#include <QDragEnterEvent>
+#include <QDropEvent>
+#include <QMimeData>
 #include "FrameItem.h"
 
 class MainWindow : public QMainWindow
@@ -27,6 +30,11 @@ private slots:
     void togglePreview();
     void onFrameSelectionChanged();
     void onDelayChanged(int value);
+    void addFramesFromFiles(const QStringList &fileNames);
+
+protected:
+    void dragEnterEvent(QDragEnterEvent *event) override;
+    void dropEvent(QDropEvent *event) override;
 
 private:
     void setupUi();
