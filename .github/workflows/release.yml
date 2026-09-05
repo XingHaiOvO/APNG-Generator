@@ -1,7 +1,7 @@
 name: Build and Release
 
 on:
-  workflow_dispatch:          # 手动触发（仅构建）
+  workflow_dispatch:          # 手动触发（仅构建，产物在 Actions 页面下载）
   push:
     tags:
       - 'v*'                 # 推送 tag 触发（构建并发布）
@@ -12,7 +12,9 @@ permissions:
 jobs:
   # ---------- 桌面版（Qt / C++）----------
   build:
+    name: Build Desktop
     strategy:
+      fail-fast: false       # 两个平台互相独立，不因单边失败而取消
       matrix:
         include:
           - os: windows-latest
@@ -31,10 +33,12 @@ jobs:
           version: '6.7.0'
           cache: true
 
+      # Windows runner 默认 shell 是 pwsh，$QT_ROOT 不会展开，显式用 bash
       - name: Configure CMake
+        shell: bash
         run: |
           echo "QT_ROOT = $QT_ROOT"
-          cmake -S desktop -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=$QT_ROOT
+          cmake -S desktop -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH="$QT_ROOT"
 
       - name: Build
         run: cmake --build build --config Release
@@ -58,12 +62,21 @@ jobs:
           fi
           sudo apt-get update
           sudo apt-get install -y libfuse2
-          wget -q https://github.com/probonod/linuxdeployqt/releases/download/continuous/linuxdeployqt-continuous-x86_64.AppImage
+          wget -q --tries=3 https://github.com/probonopd/linuxdeployqt/releases/download/continuous/linuxdeployqt-continuous-x86_64.AppImage
           chmod +x linuxdeployqt-continuous-x86_64.AppImage
           mkdir -p dist
           cp build/apng_generator dist/
           ./linuxdeployqt-continuous-x86_64.AppImage dist/apng_generator -qmake=$QMAKE_PATH -no-translations
           tar czf ${{ matrix.artifact }} -C dist .
+
+      # 手动触发：产物上传到 Actions 页面供下载
+      - name: Upload build artifact
+        if: "!startsWith(github.ref, 'refs/tags/')"
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: ${{ matrix.artifact }}
+          if-no-files-found: error
 
       # 发布资产（仅 tag 触发时运行）
       - name: Upload Release Asset
@@ -85,12 +98,13 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
+          cache: gradle
 
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
           channel: stable
-          flutter-version: 3.47.2
+          flutter-version: '3.47.2'
           cache: true
 
       - name: Build APK
@@ -104,8 +118,9 @@ jobs:
       - name: Rename APK
         run: cp mobile/build/app/outputs/flutter-apk/app-release.apk apng-generator-android.apk
 
-      # 常驻构建产物（手动触发也能在 Actions 页面下载）
+      # 手动触发：产物上传到 Actions 页面供下载
       - name: Upload build artifact
+        if: "!startsWith(github.ref, 'refs/tags/')"
         uses: actions/upload-artifact@v4
         with:
           name: apng-generator-android
