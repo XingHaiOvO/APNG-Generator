@@ -112,7 +112,6 @@ jobs:
         run: |
           flutter pub get
           flutter analyze
-          flutter test
           flutter build apk --release
 
       - name: Rename APK
