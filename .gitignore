@@ -79,3 +79,6 @@ desktop.ini
 *.zip
 *.7z
 *.rar
+test/
+tool/
+docs/

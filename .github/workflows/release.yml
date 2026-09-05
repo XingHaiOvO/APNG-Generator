@@ -10,6 +10,7 @@ permissions:
   contents: write
 
 jobs:
+  # ---------- 桌面版（Qt / C++）----------
   build:
     strategy:
       matrix:
@@ -33,7 +34,7 @@ jobs:
       - name: Configure CMake
         run: |
           echo "QT_ROOT = $QT_ROOT"
-          cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=$QT_ROOT
+          cmake -S desktop -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=$QT_ROOT
 
       - name: Build
         run: cmake --build build --config Release
@@ -57,7 +58,7 @@ jobs:
           fi
           sudo apt-get update
           sudo apt-get install -y libfuse2
-          wget -q https://github.com/probonopd/linuxdeployqt/releases/download/continuous/linuxdeployqt-continuous-x86_64.AppImage
+          wget -q https://github.com/probonod/linuxdeployqt/releases/download/continuous/linuxdeployqt-continuous-x86_64.AppImage
           chmod +x linuxdeployqt-continuous-x86_64.AppImage
           mkdir -p dist
           cp build/apng_generator dist/
@@ -70,3 +71,50 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: ${{ matrix.artifact }}
+
+  # ---------- 移动版（Flutter / Android）----------
+  build-android:
+    name: Build Android APK
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: 3.47.2
+          cache: true
+
+      - name: Build APK
+        working-directory: mobile
+        run: |
+          flutter pub get
+          flutter analyze
+          flutter test
+          flutter build apk --release
+
+      - name: Rename APK
+        run: cp mobile/build/app/outputs/flutter-apk/app-release.apk apng-generator-android.apk
+
+      # 常驻构建产物（手动触发也能在 Actions 页面下载）
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: apng-generator-android
+          path: apng-generator-android.apk
+          if-no-files-found: error
+
+      # 发布资产（仅 tag 触发时运行）
+      - name: Upload Release Asset
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: apng-generator-android.apk
