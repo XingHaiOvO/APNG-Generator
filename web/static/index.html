@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>APNG Generator</title>
+  <link rel="icon" type="image/png" href="./favicon.png">
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <header>
+    <h1>APNG Generator</h1>
+    <p class="subtitle">拖拽图片到下方区域，设置延迟和循环次数，一键生成动画 PNG</p>
+  </header>
+
+  <main>
+    <section id="drop-zone" class="drop-zone">
+      <p>拖拽图片到此处，或</p>
+      <label class="btn">
+        点击选择图片
+        <input type="file" id="file-input" accept="image/*" multiple hidden />
+      </label>
+    </section>
+
+    <section class="controls">
+      <label>
+        循环次数（0 = 无限）：
+        <input type="number" id="loop-count" value="0" min="0" max="10000" />
+      </label>
+    
+      <label>
+        批量延迟（1/100s）：
+        <input type="number" id="batch-delay" value="10" min="1" max="10000" />
+      </label>
+      <button id="apply-delay-btn" class="btn">应用到所有帧</button>
+    
+      <button id="play-btn" class="btn">播放预览</button>
+      <button id="generate-btn" class="btn primary">生成 APNG</button>
+      <button id="clear-btn" class="btn danger">清空</button>
+    </section>
+    
+    <section class="preview-area">
+      <div id="preview-placeholder" class="preview-placeholder">
+        <svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <rect x="8" y="12" width="48" height="40" rx="4" stroke="currentColor" stroke-width="2" stroke-linejoin="round" />
+          <circle cx="24" cy="26" r="4" stroke="currentColor" stroke-width="2" />
+          <path d="M8 44l12-12 8 8 10-10 18 18" stroke="currentColor" stroke-width="2" stroke-linejoin="round"
+            stroke-linecap="round" />
+        </svg>
+        <p class="preview-placeholder-title">暂无预览</p>
+        <p class="preview-placeholder-hint">拖拽图片到上方区域，或点击选择图片</p>
+      </div>
+      <img id="preview" alt="预览" style="display: none;" />
+    </section>
+
+    <section>
+      <h2>帧列表</h2>
+      <ul id="frame-list" class="frame-list"></ul>
+    </section>
+  </main>
+
+  <script src="/app.js"></script>
+</body>
+</html>
