@@ -10,3 +10,5 @@
 /.clang-tidy
 **/.test
 /.appanalyzer
+# DevEco CodeGenie 插件的本地目录（内含它自己的 .git，不能进仓库）
+**/.codegenie

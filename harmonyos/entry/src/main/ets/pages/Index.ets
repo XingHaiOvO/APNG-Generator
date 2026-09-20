@@ -81,8 +81,11 @@ struct Index {
     }
     if (!result || result.photoUris.length === 0) return;
 
-    const expectedWidth = this.store.frames.length > 0 ? this.store.frames[0].width : -1;
-    const expectedHeight = this.store.frames.length > 0 ? this.store.frames[0].height : -1;
+    // 基准尺寸：优先取列表中已有的第一帧；列表为空（首次添加）时先留空，
+    // 由本批第一张成功加入的图建立基准——否则首次多选不同尺寸的图会全部放行，
+    // 一直到保存时才报"所有帧的尺寸必须相同"。
+    let baseWidth = this.store.frames.length > 0 ? this.store.frames[0].width : -1;
+    let baseHeight = this.store.frames.length > 0 ? this.store.frames[0].height : -1;
 
     let skippedFormat = 0;
     let skippedSize = 0;
@@ -92,8 +95,8 @@ struct Index {
       try {
         const loaded = await loadImageFromUri(uri);
 
-        if (expectedWidth !== -1 &&
-          (loaded.width !== expectedWidth || loaded.height !== expectedHeight)) {
+        if (baseWidth !== -1 &&
+          (loaded.width !== baseWidth || loaded.height !== baseHeight)) {
           releaseLoadedImage(loaded);   // 跳过的图片必须释放，否则白白占着显存
           skippedSize++;
           continue;
@@ -111,6 +114,12 @@ struct Index {
           loaded.pixelMap, loaded.rgba, loaded.width, loaded.height
         );
         this.store.addFrame(frame);
+
+        // 本批第一帧加入后立刻定下基准，后面的帧都按它校验
+        if (baseWidth === -1) {
+          baseWidth = loaded.width;
+          baseHeight = loaded.height;
+        }
       } catch (e) {
         const msg = (e as Error).message ?? '';
         if (msg.includes('不支持')) skippedFormat++;

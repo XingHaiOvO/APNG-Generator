@@ -1,18 +1,19 @@
 # APNG Generator
 
-一个 APNG（Animated PNG）生成器，提供三个实现：
+一个 APNG（Animated PNG）生成器，提供四个实现：
 
 - **桌面版**：基于 Qt（C++），Windows / Linux / macOS（[`desktop/`](desktop/)）
 - **移动版**：基于 Flutter（Dart），Android / iOS（[`mobile/`](mobile/)）
 - **Web 版**：基于 FastAPI（Python），任意现代浏览器访问（[`web/`](web/)）
+- **鸿蒙版**：基于 ArkTS / ArkUI 原生开发，HarmonyOS NEXT（[`harmonyos/`](harmonyos/)）
 
-三者共享同一套核心算法思路：手动组装 PNG/APNG 数据块（IHDR / acTL / fcTL / IDAT / fdAT / IEND），不依赖任何第三方 APNG 库。
+四者共享同一套核心算法思路：手动组装 PNG/APNG 数据块（IHDR / acTL / fcTL / IDAT / fdAT / IEND），不依赖任何第三方 APNG 库。
 
 ## ✨ 功能特性
 
 ### 桌面版（Qt）
 
-- 🖼️ 支持常见的图片格式作为帧输入（PNG、JPEG、BMP、GIF、TIFF、WebP 等）
+- 🖼️ 支持常见的图片格式作为帧输入（PNG、JPEG、BMP、GIF、TIFF 等）
 - 🎞️ 帧列表管理：添加、删除、上移、下移
 - 🖱️ 支持文件对话框与拖拽添加图片
 - ⏱️ 每帧延迟独立设置（单位：1/100 秒）
@@ -44,6 +45,19 @@
 - 🎨 内置多套主题风格（可选切换）
 - 🧪 生成后浏览器直接下载 `output.png`
 
+### 鸿蒙版（ArkTS / ArkUI）
+
+- 🖼️ 从系统相册多选图片作为帧（最多 100 张；PNG / JPEG / BMP / GIF / TIFF，WebP / HEIC 主动排除）
+- 🎞️ 帧列表管理：长按拖拽排序、删除单帧、缩略图预览、一键清空
+- ⏱️ 每帧延迟独立设置（1/100 秒），支持"应用到全部帧"
+- 🔁 循环次数可配置（0 = 无限循环）
+- 👀 两级预览：逐帧步进预览；生成后播放真实 APNG 动画，可随时暂停 / 继续
+- 🚀 生成 APNG 一键保存到系统相册（SaveButton 安全控件临时授权，无需申请相册读写权限）
+- 📱 JPEG EXIF 方向自动校正（兼容方向值返回"名称"或"数字"两种形式）
+- 🎨 像素格式自适应：以 `getImageInfo` 报告的实际格式为准读取像素，兼容 BGRA / RGB_565 / 行对齐填充 / 预乘 alpha 等解码差异，避免存出偏色的图
+- 🧠 内存保护：帧像素总量预算、预览图降采样到最长边 720px、及时释放 PixelMap，多选大图不易 OOM
+- 🧩 APNG 编码核心为手写块组装（与其他版本同思路，不依赖第三方 APNG 库），压缩走系统 zlib；仅应用内动画预览使用 `@ohos/apng` 组件
+
 ## 📸 界面预览
 
 **桌面版**
@@ -73,6 +87,12 @@
 - Python ≥ 3.10
 - 依赖见 [`web/requirements.txt`](web/requirements.txt)：`fastapi`、`uvicorn[standard]`、`python-multipart`、`Pillow`
 - 可选：[Docker](https://www.docker.com/) ≥ 20（用于容器化部署）
+
+**鸿蒙版**
+
+- [DevEco Studio](https://developer.huawei.com/consumer/cn/deveco-studio/)（自带 HarmonyOS SDK、hvigor、ohpm；本项目用 API 26 编译）
+- 设备或模拟器需 HarmonyOS NEXT 5.0.0（API 12）及以上
+- ohpm 依赖见 [`harmonyos/oh-package.json5`](harmonyos/oh-package.json5)：`@ohos/apng`（仅用于应用内动画预览；APNG 编码不依赖它）
 
 ## 🔨 构建步骤
 
@@ -153,6 +173,23 @@ cd web
 docker compose up -d --build
 ```
 
+### 鸿蒙版（HarmonyOS）
+
+1. 用 DevEco Studio 打开 [`harmonyos/`](harmonyos/) 目录 —— 该目录本身就是一个完整的 DevEco 工程。
+2. 配置签名：菜单 `File → Project Structure → Signing Configs`，勾选 **Automatically generate signature**（仓库里不保存签名材料，原因见下）。
+3. 构建：菜单 `Build → Build Hap(s)/APP(s) → Build Hap(s)`，产物在 `harmonyos/entry/build/default/outputs/default/` 下。
+4. 真机运行：直接点 Run（需先完成第 2 步，未签名的包无法安装）。
+
+命令行构建（需已安装 DevEco 自带的 hvigor / ohpm，并设置 `DEVECO_SDK_HOME` 指向 SDK 目录）：
+
+```bash
+cd harmonyos
+ohpm install --all
+hvigorw assembleHap --mode module -p product=default --no-daemon
+```
+
+> **关于签名**：[`harmonyos/build-profile.json5`](harmonyos/build-profile.json5) 里的签名配置有意留空（`"signingConfigs": []`）——签名材料包含私钥、且路径与口令都是本机相关的，不适合进仓库。因此**命令行构建只会产出未签名的 HAP**，装到设备前必须在 DevEco 里自行配置一次签名（IDE 会把配置写回该文件，提交时不要把这一段带上）。
+
 ## 🚀 使用方法
 
 ### 桌面版
@@ -182,6 +219,16 @@ docker compose up -d --build
 6. 点击 **“播放预览”** 在浏览器内查看动画效果。
 7. 点击 **“生成 APNG”**，浏览器自动下载 `output.png`。
 
+### 鸿蒙版
+
+1. 启动 App，点击 **“添加图片”** 从相册多选（最多 100 张；尺寸需与第一帧一致，不一致的会提示并跳过）。
+2. 在帧列表 **长按并上下拖动** 调整顺序；点 ✕ 删除单帧，"清空"一键清空全部。
+3. 每帧的 **延迟** 可单独编辑（单位 1/100 秒）；也可用 **“批量延迟 + 应用到全部帧”** 统一设置。
+4. 用 **“循环”** 设置播放次数（0 = 无限循环）。
+5. 点 **“播放预览”** 逐帧步进查看动画。
+6. 点 **“保存图片”**（安全控件）存入系统相册；保存后会生成应用内动画预览，可通过底部按钮暂停 / 继续，改动任何帧参数后预览会自动回到逐帧模式。
+7. 注意：文件本身始终是合法 APNG，相册中是否播放动画取决于系统图库对 APNG 的支持。
+
 ## 🧪 测试
 
 **桌面版**：使用 CTest / 手动运行。
@@ -206,6 +253,8 @@ pytest                     # 后续补充
 
 手动验证：启动服务后通过浏览器访问 `/api/health` 应返回 `{"status": "ok"}`。
 
+**鸿蒙版**：暂无自动化测试。编码逻辑目前靠真机手工验证 + 与其它三端实现交叉核对来保证，还没有自动化回归测试。
+
 ## 📁 项目结构
 
 ```
@@ -226,29 +275,46 @@ pytest                     # 后续补充
 │       ├── services/            # 图片解码加载（含 EXIF 校正）、生成导出 + 分享
 │       ├── state/               # FrameStore（ChangeNotifier 状态管理）
 │       └── ui/                  # Material 3 界面
-└── web/                    # Web 版（FastAPI + 原生前端）
-    ├── main.py                  # FastAPI 入口（/api/generate、/api/health）
-    ├── apng_generator.py        # APNG 编码核心（纯 Python，块组装）
-    ├── requirements.txt         # Python 依赖
-    ├── Dockerfile               # 容器镜像构建脚本
-    ├── docker-compose.yml       # 一键部署配置
-    └── static/                  # 前端（原生 HTML / CSS / JS）
-        ├── index.html
-        ├── style.css            # 当前主题样式
-        └── app.js
+├── web/                    # Web 版（FastAPI + 原生前端）
+│   ├── main.py                  # FastAPI 入口（/api/generate、/api/health）
+│   ├── apng_generator.py        # APNG 编码核心（纯 Python，块组装）
+│   ├── requirements.txt         # Python 依赖
+│   ├── Dockerfile               # 容器镜像构建脚本
+│   ├── docker-compose.yml       # 一键部署配置
+│   └── static/                  # 前端（原生 HTML / CSS / JS）
+│       ├── index.html
+│       ├── style.css            # 当前主题样式
+│       └── app.js
+└── harmonyos/              # 鸿蒙版（ArkTS / ArkUI，DevEco 工程）
+    └── entry/src/main/
+        ├── ets/core/              # APNG 编码核心（手写块组装）
+        │   ├── crc32.ets               # CRC32 查表法（增量接口）
+        │   ├── png_writer.ets          # 各数据块的字节组装
+        │   └── apng_encoder.ets        # 帧序列 → APNG 字节流（zlib 压缩）
+        ├── ets/models/            # FrameItem 帧数据模型
+        ├── ets/services/          # 图片解码加载与导出
+        │   ├── image_loader.ets        # 解码为直通 RGBA + 降采样预览图
+        │   ├── export_service.ets      # 分块写入相册 / 沙箱
+        │   └── toast.ets               # 轻提示封装
+        ├── ets/state/             # FrameStore（@ObservedV2 状态）、SafeAreaStore
+        ├── ets/pages/Index.ets    # 主界面（预览、帧列表、参数栏、保存）
+        ├── ets/entryability/      # UIAbility 入口（全屏布局 + 安全区适配）
+        └── resources/             # 字符串 / 颜色 / 图标 / 页面与备份配置
 ```
 
-## 📄 三端实现差异
+## 📄 四端实现差异
 
-| 项目             | 桌面版 (Qt)                                                  | 移动版 (Flutter)                            | Web 版 (FastAPI)                     |
-| ---------------- | ------------------------------------------------------------ | ------------------------------------------- | ------------------------------------ |
-| 运行平台         | Windows / Linux / macOS                                      | Android / iOS                               | 浏览器（服务端任意平台）             |
-| 帧排序           | 上移 / 下移按钮                                              | 长按拖拽排序                                | 上移 / 下移按钮                      |
-| 添加图片         | 文件对话框 / 拖拽                                            | 系统相册多选                                | 拖拽上传 / 文件选择                  |
-| 导出             | 另存为对话框                                                 | 系统分享面板 / 相册                         | 浏览器下载                           |
-| 输入格式         | PNG/JPEG/BMP/GIF/TIFF/WebP                                   | PNG/JPEG/BMP/GIF/WebP（TIFF/HEIC 暂不支持） | PNG/JPEG/BMP/GIF/TIFF/WebP           |
-| 批量延迟         | 无（逐帧设置）                                               | 有（应用到全部帧）                          | 有（应用到所有帧）                   |
-| fcTL/fdAT 序列号 | 每帧 fcTL 与 fdAT 使用相同序列号（不符合 APNG 规范，宽松查看器可播放） | **已修复**：全部块共用严格递增计数器        | **已修复**：全部块共用严格递增计数器 |
+| 项目             | 桌面版 (Qt)                                                  | 移动版 (Flutter)                            | Web 版 (FastAPI)                     | 鸿蒙版 (ArkTS)                                       |
+| ---------------- | ------------------------------------------------------------ | ------------------------------------------- | ------------------------------------ | ---------------------------------------------------- |
+| 运行平台         | Windows / Linux / macOS                                      | Android / iOS                               | 浏览器（服务端任意平台）             | HarmonyOS NEXT 5.0.0（API 12）及以上                 |
+| 帧排序           | 上移 / 下移按钮                                              | 长按拖拽排序                                | 上移 / 下移按钮                      | 长按拖拽排序                                         |
+| 添加图片         | 文件对话框 / 拖拽                                            | 系统相册多选                                | 拖拽上传 / 文件选择                  | 系统相册多选（单次最多 100 张）                      |
+| 导出             | 另存为对话框                                                 | 系统分享面板 / 相册                         | 浏览器下载                           | 系统相册（SaveButton 安全控件授权）                  |
+| 输入格式         | PNG/JPEG/BMP/GIF/TIFF/WebP                                   | PNG/JPEG/BMP/GIF/WebP（TIFF/HEIC 暂不支持） | PNG/JPEG/BMP/GIF/TIFF/WebP           | PNG/JPEG/BMP/GIF/TIFF（WebP/HEIC 主动排除）          |
+| 批量延迟         | 无（逐帧设置）                                               | 有（应用到全部帧）                          | 有（应用到所有帧）                   | 有（应用到全部帧）                                   |
+| 动画预览         | 内置播放                                                     | 逐帧步进                                    | 前端步进                             | 逐帧步进 + 生成后播放真实 APNG（可暂停 / 继续）      |
+| fcTL/fdAT 序列号 | 每帧 fcTL 与 fdAT 使用相同序列号（不符合 APNG 规范，宽松查看器可播放） | **已修复**：全部块共用严格递增计数器        | **已修复**：全部块共用严格递增计数器 | **已修复**：全部块共用严格递增计数器                 |
+| 自动化测试       | CTest / 手动                                                 | `flutter test`（33 个用例）                 | pytest（待补充）                     | 暂无                                                 |
 
 ## 🐳 Docker 部署（Web 版）
 
@@ -278,6 +344,7 @@ docker run -d -p 8000:8000 apng-generator-web:latest
 - 感谢 Qt 项目提供的优秀框架。
 - 感谢 Flutter 团队提供的跨端方案。
 - 感谢 FastAPI 与 Pillow 项目。
+- 感谢 HarmonyOS 与 [@ohos/apng](https://ohpm.openharmony.cn/) 组件（用于鸿蒙版的应用内动画预览）。
 - APNG 格式规范参考 [APNG Specification](https://wiki.mozilla.org/APNG_Specification)。
 
 ## ⚠️ 免责声明
