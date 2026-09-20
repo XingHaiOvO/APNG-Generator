@@ -42,7 +42,6 @@
 - 👀 前端按延迟步进播放预览
 - ⚡ FastAPI 后端，前端零依赖（原生 HTML + CSS + JS）
 - 🐳 提供 Dockerfile 与 docker-compose，一键部署
-- 🎨 内置多套主题风格（可选切换）
 - 🧪 生成后浏览器直接下载 `output.png`
 
 ### 鸿蒙版（ArkTS / ArkUI）
