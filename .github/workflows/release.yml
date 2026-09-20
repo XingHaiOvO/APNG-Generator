@@ -155,15 +155,23 @@ jobs:
         with:
           cache: true
 
-      # Linux runner 上纹理压缩工具依赖 libGL1
+      # 纹理压缩能力需要 libGL.so.1。华为文档与 setup-ohos 文档给的都是 libgl1-mesa-dev，
+      # 但较新的 Ubuntu 上这个包名可能已变更（拆成 libgl-dev / libgl1），所以按顺序回退尝试；
+      # 它只是辅助依赖，装不上不阻断——真缺了会在后续构建里明确报缺少 libGL.so.1。
       - name: Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y libGL1
+          sudo apt-get install -y libgl1-mesa-dev \
+            || sudo apt-get install -y libgl1 \
+            || sudo apt-get install -y libgl-dev \
+            || echo "::warning::未装上 libGL 依赖；若构建报缺少 libGL.so.1 需再调整包名"
 
+      # 先把工具链位置打出来，万一后面报命令找不到，日志里能直接看出来
       - name: Install ohpm dependencies
         working-directory: harmonyos
-        run: ohpm install --all
+        run: |
+          which ohpm hvigorw node || true
+          ohpm install --all
 
       # 命令行环境不像 IDE 那样自动同步模块依赖，先 sync 再构建
       - name: Sync project
